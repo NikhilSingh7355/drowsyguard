@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DrowsyGuard · Driver Drowsiness Detection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <style type="text/tailwindcss">
+    @layer components {
+      .card { @apply rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur; }
+      .badge { @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide; }
+      .btn { @apply inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed; }
+      .btn-primary { @apply bg-gradient-to-r from-cyan-500 to-violet-500 text-white hover:brightness-110; }
+      .btn-ghost { @apply border border-slate-700 bg-slate-800/60 text-slate-200 hover:bg-slate-700/70; }
+      .btn-danger { @apply bg-rose-600 text-white hover:bg-rose-500; }
+    }
+  </style>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .bg-grid { background-image: radial-gradient(circle at 20% 0%, rgba(34,211,238,.10), transparent 40%),
+                                 radial-gradient(circle at 90% 10%, rgba(139,92,246,.12), transparent 40%); }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 bg-grid text-slate-200 antialiased">
+  <header class="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+      <a href="{% url 'dashboard' %}" class="flex items-center gap-3">
+        <span class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 text-white">
+          <i data-lucide="eye" class="h-5 w-5"></i>
+        </span>
+        <span>
+          <span class="block text-lg font-extrabold leading-none tracking-tight">DrowsyGuard</span>
+          <span class="block text-[11px] text-slate-400">OpenCV · MediaPipe · Django</span>
+        </span>
+      </a>
+      <nav class="flex gap-1 text-sm font-medium">
+        {% with p=page %}
+        <a href="{% url 'dashboard' %}" class="flex items-center gap-2 rounded-lg px-3 py-2 {% if p == 'dashboard' %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-white{% endif %}"><i data-lucide="layout-dashboard" class="h-4 w-4"></i><span class="hidden sm:inline">Dashboard</span></a>
+        <a href="{% url 'history' %}" class="flex items-center gap-2 rounded-lg px-3 py-2 {% if p == 'history' %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-white{% endif %}"><i data-lucide="bar-chart-3" class="h-4 w-4"></i><span class="hidden sm:inline">History</span></a>
+        <a href="{% url 'settings' %}" class="flex items-center gap-2 rounded-lg px-3 py-2 {% if p == 'settings' %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-white{% endif %}"><i data-lucide="sliders-horizontal" class="h-4 w-4"></i><span class="hidden sm:inline">Settings</span></a>
+        {% endwith %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6">
+    {% if messages %}
+      {% for m in messages %}
+        <div class="mb-4 rounded-xl border px-4 py-3 text-sm {% if m.tags == 'error' %}border-rose-500/40 bg-rose-500/10 text-rose-200{% else %}border-emerald-500/40 bg-emerald-500/10 text-emerald-200{% endif %}">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="mx-auto max-w-7xl px-4 pb-8 text-center text-xs text-slate-500">
+    Driver Drowsiness Detection · Eye Aspect Ratio + Mouth Aspect Ratio + PERCLOS · College Mini Project
+  </footer>
+  <script>document.addEventListener('DOMContentLoaded', () => lucide.createIcons());</script>
+</body>
+</html>

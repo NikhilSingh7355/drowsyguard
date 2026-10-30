@@ -1,0 +1,80 @@
+{% extends 'monitor/base.html' %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-extrabold tracking-tight">History & Reports</h1>
+    <div class="flex gap-2">
+      <a href="{% url 'export_csv' %}" class="btn btn-ghost"><i data-lucide="download" class="h-4 w-4"></i> Export CSV</a>
+      <form method="post" action="{% url 'clear_history' %}" onsubmit="return confirm('Saari history delete kar du?')">
+        {% csrf_token %}
+        <button class="btn btn-danger"><i data-lucide="trash-2" class="h-4 w-4"></i> Clear</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-3">
+    <div class="card p-5"><div class="text-xs text-slate-400">Total sessions</div><div class="mt-1 text-3xl font-extrabold text-cyan-300">{{ totals.sessions }}</div></div>
+    <div class="card p-5"><div class="text-xs text-slate-400">Drowsy alerts</div><div class="mt-1 text-3xl font-extrabold text-rose-400">{{ totals.drowsy }}</div></div>
+    <div class="card p-5"><div class="text-xs text-slate-400">Yawns</div><div class="mt-1 text-3xl font-extrabold text-amber-400">{{ totals.yawns }}</div></div>
+  </div>
+
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">Last 7 days</h2>
+    <div class="h-64"><canvas id="weekChart"></canvas></div>
+  </section>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <section class="card overflow-hidden">
+      <h2 class="px-5 pt-5 text-sm font-semibold uppercase tracking-wider text-slate-400">Sessions</h2>
+      <div class="overflow-x-auto p-2">
+        <table class="w-full text-left text-sm">
+          <thead class="text-xs text-slate-400"><tr><th class="px-3 py-2">#</th><th class="px-3 py-2">Started</th><th class="px-3 py-2">Duration</th><th class="px-3 py-2">Drowsy</th><th class="px-3 py-2">Yawns</th><th class="px-3 py-2">Peak</th></tr></thead>
+          <tbody>
+          {% for s in sessions %}
+            <tr class="border-t border-slate-800"><td class="px-3 py-2">{{ s.id }}</td><td class="px-3 py-2">{{ s.started_at|date:"d M, H:i" }}</td><td class="px-3 py-2">{{ s.duration|default:"running" }}</td><td class="px-3 py-2 text-rose-300">{{ s.drowsy_alerts }}</td><td class="px-3 py-2 text-amber-300">{{ s.yawns }}</td><td class="px-3 py-2">{{ s.peak_score }}</td></tr>
+          {% empty %}
+            <tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">Koi session nahi. Dashboard se Start karo.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card overflow-hidden">
+      <h2 class="px-5 pt-5 text-sm font-semibold uppercase tracking-wider text-slate-400">Alert log</h2>
+      <div class="overflow-x-auto p-2">
+        <table class="w-full text-left text-sm">
+          <thead class="text-xs text-slate-400"><tr><th class="px-3 py-2">Type</th><th class="px-3 py-2">Time</th><th class="px-3 py-2">EAR</th><th class="px-3 py-2">MAR</th><th class="px-3 py-2">Sec</th></tr></thead>
+          <tbody>
+          {% for e in events %}
+            <tr class="border-t border-slate-800">
+              <td class="px-3 py-2"><span class="badge {% if e.kind == 'DROWSY' %}bg-rose-500/20 text-rose-300{% else %}bg-amber-500/20 text-amber-300{% endif %}">{{ e.kind }}</span></td>
+              <td class="px-3 py-2">{{ e.created_at|date:"d M, H:i:s" }}</td><td class="px-3 py-2">{{ e.ear|floatformat:2 }}</td><td class="px-3 py-2">{{ e.mar|floatformat:2 }}</td><td class="px-3 py-2">{{ e.duration|floatformat:1 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="px-3 py-6 text-center text-slate-500">Abhi koi alert nahi.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+{{ chart|json_script:"chart-data" }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const c = JSON.parse(document.getElementById('chart-data').textContent);
+  new Chart(document.getElementById('weekChart'), {
+    type: 'bar',
+    data: { labels: c.labels, datasets: [
+      { label: 'Drowsy', data: c.drowsy, backgroundColor: '#fb7185', borderRadius: 6 },
+      { label: 'Yawns', data: c.yawn, backgroundColor: '#fbbf24', borderRadius: 6 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: 'rgba(148,163,184,.12)' } } },
+      plugins: { legend: { labels: { color: '#cbd5e1' } } } },
+  });
+});
+</script>
+{% endblock %}

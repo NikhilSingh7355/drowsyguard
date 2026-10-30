@@ -1,0 +1,45 @@
+{% extends 'monitor/base.html' %}
+{% block content %}
+<div class="mx-auto max-w-2xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-extrabold tracking-tight">Detection Settings</h1>
+    <p class="mt-1 text-sm text-slate-400">Yahan se thresholds tune karo. Camera chalte hue bhi 1 second me apply ho jata hai.</p>
+  </div>
+
+  <form method="post" class="card space-y-6 p-6" x-data="{ ear: {{ cfg.ear_threshold }}, mar: {{ cfg.mar_threshold }}, cl: {{ cfg.closed_seconds }}, yw: {{ cfg.yawn_seconds }} }">
+    {% csrf_token %}
+
+    <div>
+      <div class="flex justify-between text-sm"><label class="font-semibold">EAR threshold <span class="font-normal text-slate-400">(isse niche = aankh band)</span></label><span class="font-mono text-cyan-300" x-text="Number(ear).toFixed(2)"></span></div>
+      <input type="range" name="ear_threshold" min="0.10" max="0.40" step="0.01" x-model="ear" class="mt-2 w-full accent-cyan-400">
+    </div>
+    <div>
+      <div class="flex justify-between text-sm"><label class="font-semibold">Closed-eye time <span class="font-normal text-slate-400">(sec, drowsy alert se pehle)</span></label><span class="font-mono text-cyan-300" x-text="Number(cl).toFixed(1) + 's'"></span></div>
+      <input type="range" name="closed_seconds" min="0.5" max="4" step="0.1" x-model="cl" class="mt-2 w-full accent-cyan-400">
+    </div>
+    <div>
+      <div class="flex justify-between text-sm"><label class="font-semibold">MAR threshold <span class="font-normal text-slate-400">(isse upar = yawn)</span></label><span class="font-mono text-violet-300" x-text="Number(mar).toFixed(2)"></span></div>
+      <input type="range" name="mar_threshold" min="0.30" max="1.00" step="0.05" x-model="mar" class="mt-2 w-full accent-violet-400">
+    </div>
+    <div>
+      <div class="flex justify-between text-sm"><label class="font-semibold">Yawn duration <span class="font-normal text-slate-400">(sec)</span></label><span class="font-mono text-violet-300" x-text="Number(yw).toFixed(1) + 's'"></span></div>
+      <input type="range" name="yawn_seconds" min="0.5" max="3" step="0.1" x-model="yw" class="mt-2 w-full accent-violet-400">
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-3">
+      <div>
+        <label class="text-sm font-semibold">Camera index</label>
+        <input type="number" name="camera_index" min="0" max="10" value="{{ cfg.camera_index }}" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm">
+      </div>
+      <label class="flex items-center gap-3 rounded-xl bg-slate-800/60 px-4 py-3 text-sm font-medium">
+        <input type="checkbox" name="show_landmarks" {% if cfg.show_landmarks %}checked{% endif %} class="h-4 w-4 accent-cyan-400"> Show landmarks
+      </label>
+      <label class="flex items-center gap-3 rounded-xl bg-slate-800/60 px-4 py-3 text-sm font-medium">
+        <input type="checkbox" name="sound_enabled" {% if cfg.sound_enabled %}checked{% endif %} class="h-4 w-4 accent-cyan-400"> Alarm sound
+      </label>
+    </div>
+
+    <button class="btn btn-primary"><i data-lucide="save" class="h-4 w-4"></i> Save settings</button>
+  </form>
+</div>
+{% endblock %}

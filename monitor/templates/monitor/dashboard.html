@@ -1,0 +1,192 @@
+{% extends 'monitor/base.html' %}
+{% block content %}
+<div x-data="dash()" x-init="init()" class="space-y-6">
+
+  <div x-show="error" x-cloak class="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" x-text="error"></div>
+  <div x-show="calibMsg" x-cloak class="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100" x-text="calibMsg"></div>
+
+  <div class="grid gap-6 lg:grid-cols-3">
+    <!-- LIVE VIDEO -->
+    <section class="card overflow-hidden lg:col-span-2">
+      <div class="relative aspect-[4/3] bg-black">
+        <img src="{% url 'video_feed' %}" alt="Live camera" class="h-full w-full object-contain">
+        <div class="absolute left-3 top-3 flex gap-2">
+          <span class="badge" :class="badge()" x-text="m.status"></span>
+          <span x-show="running" class="badge bg-slate-900/80 text-slate-300" x-text="m.fps + ' FPS'"></span>
+        </div>
+        <div x-show="m.calibrating > 0" x-cloak class="absolute inset-0 grid place-items-center bg-black/60 text-center">
+          <div>
+            <div class="text-6xl font-extrabold text-cyan-300" x-text="Math.ceil(m.calibrating)"></div>
+            <div class="mt-2 text-sm text-slate-200">Calibrating… aankhein normal khuli rakho aur camera ko dekho</div>
+          </div>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 p-4">
+        <button class="btn btn-primary" :disabled="busy || running" @click="act('/api/start/')">
+          <i data-lucide="play" class="h-4 w-4"></i> Start
+        </button>
+        <button class="btn btn-danger" :disabled="busy || !running" @click="act('/api/stop/')">
+          <i data-lucide="square" class="h-4 w-4"></i> Stop
+        </button>
+        <button class="btn btn-ghost" :disabled="busy" @click="act('/api/calibrate/')">
+          <i data-lucide="crosshair" class="h-4 w-4"></i> Auto-Calibrate
+        </button>
+        <button class="btn btn-ghost ml-auto" @click="sound = !sound; unlockAudio()">
+          <span x-show="sound"><i data-lucide="volume-2" class="h-4 w-4"></i></span>
+          <span x-show="!sound" x-cloak><i data-lucide="volume-x" class="h-4 w-4"></i></span>
+          <span x-text="sound ? 'Alarm ON' : 'Alarm OFF'"></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- SCORE + STATS -->
+    <aside class="space-y-6">
+      <section class="card p-6">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Drowsiness Score</h2>
+        <div class="relative mx-auto mt-4 h-48 w-48">
+          <svg viewBox="0 0 120 120" class="h-full w-full -rotate-90">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="10" class="text-slate-800"/>
+            <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"
+                    stroke-dasharray="339.29" :stroke-dashoffset="339.29 * (1 - m.score / 100)"
+                    :class="ring()" style="transition: stroke-dashoffset .4s ease"/>
+          </svg>
+          <div class="absolute inset-0 grid place-items-center text-center">
+            <div>
+              <div class="text-5xl font-extrabold" x-text="Math.round(m.score)"></div>
+              <div class="text-xs text-slate-400">out of 100</div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-3 text-center text-sm">
+          <div class="rounded-xl bg-slate-800/60 p-3"><div class="text-xs text-slate-400">EAR (eyes)</div><div class="text-xl font-bold text-cyan-300" x-text="m.ear.toFixed(2)"></div></div>
+          <div class="rounded-xl bg-slate-800/60 p-3"><div class="text-xs text-slate-400">MAR (mouth)</div><div class="text-xl font-bold text-violet-300" x-text="m.mar.toFixed(2)"></div></div>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-2 gap-4">
+        <div class="card p-4"><div class="text-xs text-slate-400">Drowsy alerts</div><div class="mt-1 text-3xl font-extrabold text-rose-400" x-text="m.drowsy_alerts"></div></div>
+        <div class="card p-4"><div class="text-xs text-slate-400">Yawns</div><div class="mt-1 text-3xl font-extrabold text-amber-400" x-text="m.yawns"></div></div>
+        <div class="card p-4"><div class="text-xs text-slate-400">Blinks</div><div class="mt-1 text-3xl font-extrabold text-cyan-300" x-text="m.blinks"></div></div>
+        <div class="card p-4"><div class="text-xs text-slate-400">PERCLOS (30s)</div><div class="mt-1 text-3xl font-extrabold text-violet-300"><span x-text="m.perclos"></span>%</div></div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-3">
+    <section class="card p-5 lg:col-span-2">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Live EAR / MAR</h2>
+        <span class="text-xs text-slate-500">dashed line = threshold</span>
+      </div>
+      <div class="h-64"><canvas id="liveChart"></canvas></div>
+    </section>
+
+    <section class="card p-5">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">Recent Alerts</h2>
+      <template x-if="recent.length === 0">
+        <p class="text-sm text-slate-500">Abhi tak koi alert nahi.</p>
+      </template>
+      <ul class="space-y-2">
+        <template x-for="e in recent" :key="e.time + e.kind">
+          <li class="flex items-center justify-between rounded-xl bg-slate-800/50 px-3 py-2 text-sm">
+            <span class="badge" :class="e.kind === 'DROWSY' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300'" x-text="e.kind"></span>
+            <span class="text-slate-400" x-text="'EAR ' + e.ear"></span>
+            <span class="font-mono text-slate-300" x-text="e.time"></span>
+          </li>
+        </template>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<script>
+let liveChart = null;
+
+function dash() {
+  return {
+    running: false, error: '', calibMsg: '', busy: false,
+    sound: {{ cfg.sound_enabled|yesno:"true,false" }},
+    recent: [], audio: null, lastBeep: 0,
+    m: { face: false, status: 'OFFLINE', ear: 0, mar: 0, score: 0, perclos: 0, blinks: 0,
+         drowsy_alerts: 0, yawns: 0, fps: 0, calibrating: 0 },
+
+    init() {
+      liveChart = new Chart(document.getElementById('liveChart'), {
+        type: 'line',
+        data: { labels: [], datasets: [
+          { label: 'EAR', data: [], borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,.12)', fill: true, tension: .35, pointRadius: 0, borderWidth: 2 },
+          { label: 'MAR', data: [], borderColor: '#a78bfa', tension: .35, pointRadius: 0, borderWidth: 2 },
+          { label: 'EAR threshold', data: [], borderColor: '#fb7185', borderDash: [6, 6], pointRadius: 0, borderWidth: 1.5 },
+          { label: 'MAR threshold', data: [], borderColor: '#fbbf24', borderDash: [6, 6], pointRadius: 0, borderWidth: 1.5 },
+        ]},
+        options: {
+          animation: false, responsive: true, maintainAspectRatio: false,
+          scales: { x: { display: false }, y: { min: 0, max: 1, grid: { color: 'rgba(148,163,184,.12)' }, ticks: { color: '#94a3b8' } } },
+          plugins: { legend: { labels: { color: '#cbd5e1', boxWidth: 12 } } },
+        },
+      });
+      this.poll();
+      setInterval(() => this.poll(), 500);
+    },
+
+    async poll() {
+      try {
+        const d = await (await fetch('/api/status/')).json();
+        this.running = d.running; this.error = d.error; this.recent = d.recent;
+        if (d.calib_msg) this.calibMsg = d.calib_msg;
+        this.m = d.metrics;
+        const s = d.series, n = s.length;
+        liveChart.data.labels = s.map((_, i) => i);
+        liveChart.data.datasets[0].data = s.map(p => p.ear);
+        liveChart.data.datasets[1].data = s.map(p => p.mar);
+        liveChart.data.datasets[2].data = Array(n).fill(d.thr.ear);
+        liveChart.data.datasets[3].data = Array(n).fill(d.thr.mar);
+        liveChart.update('none');
+        if (this.m.status === 'DROWSY') this.beep();
+      } catch (e) { /* server band ho to ignore */ }
+    },
+
+    async act(url) {
+      this.busy = true;
+      this.unlockAudio();
+      if (url.includes('calibrate')) this.calibMsg = '';
+      try { await fetch(url, { method: 'POST' }); await this.poll(); }
+      finally { this.busy = false; }
+    },
+
+    unlockAudio() {
+      if (!this.audio) this.audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.audio.state === 'suspended') this.audio.resume();
+    },
+
+    beep() {
+      if (!this.sound || !this.audio) return;
+      const t = Date.now();
+      if (t - this.lastBeep < 450) return;
+      this.lastBeep = t;
+      const o = this.audio.createOscillator(), g = this.audio.createGain();
+      o.type = 'square'; o.frequency.value = 880; g.gain.value = 0.12;
+      o.connect(g); g.connect(this.audio.destination);
+      o.start(); o.stop(this.audio.currentTime + 0.25);
+    },
+
+    badge() {
+      return {
+        'AWAKE': 'bg-emerald-500/20 text-emerald-300',
+        'TIRED': 'bg-amber-500/20 text-amber-300',
+        'YAWNING': 'bg-orange-500/20 text-orange-300',
+        'DROWSY': 'bg-rose-600 text-white animate-pulse',
+        'NO FACE': 'bg-slate-700 text-slate-300',
+        'OFFLINE': 'bg-slate-800 text-slate-400',
+      }[this.m.status] || 'bg-slate-800 text-slate-300';
+    },
+    ring() {
+      if (this.m.score >= 60) return 'text-rose-500';
+      if (this.m.score >= 35) return 'text-amber-400';
+      return 'text-emerald-400';
+    },
+  };
+}
+</script>
+<style>[x-cloak]{display:none !important}</style>
+{% endblock %}
